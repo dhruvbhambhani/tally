@@ -1,0 +1,334 @@
+{
+  "note": "Demo-provider fixtures: what a vision model returns for the sample ledger scans.",
+  "images": [
+    {
+      "sha256": "95a58cf5da73f93937abc211f8f825c09b7a585da862353f25a995f7f714a8e4",
+      "fileName": "ledger_page_1.jpg",
+      "title": "Maple Ct. - cash receipts  Sept / Oct 2026",
+      "rows": [
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.17307692307692307,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-09-02",
+              "raw": "9/2",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "102",
+              "raw": "102",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "P. Raman",
+              "raw": "P. Raman",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1285,
+              "raw": "$1,285",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "cash",
+              "raw": "cash",
+              "confidence": 0.94
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.25576923076923075,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-09-01",
+              "raw": "9/1",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "301",
+              "raw": "301",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "H. Salinas",
+              "raw": "H. Salinas",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1200,
+              "raw": "$1,200",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "money order",
+              "raw": "money order",
+              "confidence": 0.94
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.3384615384615385,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-09-03",
+              "raw": "9/3",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "408",
+              "raw": "408",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "E. Kowalski",
+              "raw": "E. Kowalski",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1525,
+              "raw": "$1,525",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "cash",
+              "raw": "cash",
+              "confidence": 0.94
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.42115384615384616,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-10-02",
+              "raw": "10/2",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "102",
+              "raw": "102",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "P. Raman",
+              "raw": "P. Raman",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1285,
+              "raw": "$1,285",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "cash",
+              "raw": "cash",
+              "confidence": 0.94
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.5038461538461538,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-10-01",
+              "raw": "10/1",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "301",
+              "raw": "301",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "H. Salinas",
+              "raw": "H. Salinas",
+              "confidence": 0.71
+            },
+            "amount": {
+              "value": 1200,
+              "raw": "$1,200",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "money order",
+              "raw": "money order",
+              "confidence": 0.94
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.5865384615384616,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-10-03",
+              "raw": "10/3",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "408",
+              "raw": "408",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "E. Kowalski",
+              "raw": "E. Kowalski",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1525,
+              "raw": "$1,525",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "cash",
+              "raw": "cash",
+              "confidence": 0.94
+            }
+          }
+        }
+      ]
+    },
+    {
+      "sha256": "cb9ad8505e77d943c21b1a4fde3e71c369495fa611a804956d8ed179a8d90420",
+      "fileName": "ledger_page_2.jpg",
+      "title": "Maple Ct. - cash receipts  Nov 2026",
+      "rows": [
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.17307692307692307,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-11-02",
+              "raw": "11/2",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "102",
+              "raw": "102",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "P. Raman",
+              "raw": "P. Raman",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1285,
+              "raw": "$1,285",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "cash",
+              "raw": "cash",
+              "confidence": 0.94
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.25576923076923075,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-11-01",
+              "raw": "11/1",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "301",
+              "raw": "301",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "H. Salinas",
+              "raw": "H. Salinas",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1200,
+              "raw": "$1,200",
+              "confidence": 0.94
+            },
+            "note": {
+              "value": "money order",
+              "raw": "money order",
+              "confidence": 0.94
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 0.04,
+            "y": 0.3384615384615385,
+            "w": 0.92,
+            "h": 0.10576923076923077
+          },
+          "cells": {
+            "date": {
+              "value": "2026-11-03",
+              "raw": "11/3",
+              "confidence": 0.94
+            },
+            "unit": {
+              "value": "408",
+              "raw": "408",
+              "confidence": 0.94
+            },
+            "name": {
+              "value": "E. Kowalski",
+              "raw": "E. Kowalski",
+              "confidence": 0.94
+            },
+            "amount": {
+              "value": 1525,
+              "raw": "$1,525",
+              "confidence": 0.58
+            },
+            "note": {
+              "value": "cash - rcpt #214",
+              "raw": "cash - rcpt #214",
+              "confidence": 0.94
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
