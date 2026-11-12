@@ -15,7 +15,7 @@ export interface WaterfallBar { key: string; label: string; base: number; value:
 export function WaterfallChart({ bars }: { bars: WaterfallBar[] }) {
   const color = (k: string) => (k === "gpr" ? INK : k === "collected" ? ACCENT : k === "unpaid" ? RED : GRAY);
   return (
-    <div className="h-[340px] w-full" role="img" aria-label={`Waterfall: ${bars.map((b) => `${b.label} ${usd(b.signed)}`).join(", ")}`}>
+    <div className="overflow-x-auto"><div className="h-[340px] w-full min-w-[640px]" role="img" aria-label={`Waterfall: ${bars.map((b) => `${b.label} ${usd(b.signed)}`).join(", ")}`}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={bars} margin={{ top: 28, right: 8, left: 8, bottom: 0 }} barCategoryGap="22%">
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#6B7280", fontSize: 13 }} interval={0} />
@@ -28,7 +28,7 @@ export function WaterfallChart({ bars }: { bars: WaterfallBar[] }) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </div></div>
   );
 }
 
@@ -49,7 +49,7 @@ export function TrendChart({ points }: { points: { label: string; rate: number }
 
 export function ExpirationsChart({ months }: { months: { label: string; count: number; flagged: boolean }[] }) {
   return (
-    <div className="h-[260px] w-full" role="img" aria-label={`Leases ending by month: ${months.map((m) => `${m.label} ${m.count}`).join(", ")}`}>
+    <div className="overflow-x-auto"><div className="h-[260px] w-full min-w-[640px]" role="img" aria-label={`Leases ending by month: ${months.map((m) => `${m.label} ${m.count}`).join(", ")}`}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={months} margin={{ top: 24, right: 0, left: 0, bottom: 0 }} barCategoryGap="28%">
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#6B7280", fontSize: 12 }} interval={0} />
@@ -60,6 +60,6 @@ export function ExpirationsChart({ months }: { months: { label: string; count: n
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </div></div>
   );
 }
