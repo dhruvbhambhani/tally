@@ -243,3 +243,16 @@ export function chargesForMonth(lease: Lease, period: Period): Charge[] {
   });
   return out;
 }
+
+/** Chart geometry for the waterfall: each reduction floats at the running total. */
+export function waterfallBars(steps: WaterfallStep[]): { key: string; label: string; base: Cents; value: Cents; signed: Cents }[] {
+  let running = 0;
+  return steps.map((s) => {
+    if (s.key === "gpr" || s.key === "collected") {
+      if (s.key === "gpr") running = s.amount;
+      return { key: s.key, label: s.label, base: 0, value: s.amount, signed: s.amount };
+    }
+    running += s.amount;
+    return { key: s.key, label: s.label, base: running, value: -s.amount, signed: s.amount };
+  });
+}
