@@ -304,17 +304,19 @@ async function ledgerImage(file: string, title: string, lines: LedgerLine[], see
 
 async function ledgers() {
   const cash = ["102", "301", "408"].map((n) => unit(n));
-  const line = (u: TUnit, date: string, note: string, extra: Partial<LedgerLine> = {}): LedgerLine => ({
-    date, unit: u.number, name: initial(u.lease!.residents[0]), amount: `$${tenantMonthly(u.lease!, "2026-10").toLocaleString("en-US")}`, note, ...extra,
+  const day = (u: TUnit, month: number, mi: number) => `${month}/${usualDay(u.number, mi)}`;
+  const line = (u: TUnit, month: number, mi: number, note: string, extra: Partial<LedgerLine> = {}): LedgerLine => ({
+    date: day(u, month, mi), unit: u.number, name: initial(u.lease!.residents[0]), amount: `$${tenantMonthly(u.lease!, "2026-10").toLocaleString("en-US")}`, note, ...extra,
   });
+  // Sept/Oct receipts repeat what is already in the tracker's payment log (same day), so they corroborate it.
   const p1 = await ledgerImage("ledger_page_1.jpg", "Maple Ct. - cash receipts  Sept / Oct 2026", [
-    line(cash[0], "9/2", "cash"), line(cash[1], "9/1", "money order"), line(cash[2], "9/3", "cash"),
-    line(cash[0], "10/2", "cash"), line(cash[1], "10/1", "money order", { conf: { name: 0.71 } }), line(cash[2], "10/3", "cash"),
+    line(cash[0], 9, 3, "cash"), line(cash[1], 9, 3, "money order"), line(cash[2], 9, 3, "cash"),
+    line(cash[0], 10, 4, "cash"), line(cash[1], 10, 4, "money order", { conf: { name: 0.71 } }), line(cash[2], 10, 4, "cash"),
   ], 3, 2026);
   const p2 = await ledgerImage("ledger_page_2.jpg", "Maple Ct. - cash receipts  Nov 2026", [
-    line(cash[0], "11/2", "cash"), line(cash[1], "11/1", "money order"),
-    // the 5 is written like an 8 → low confidence on purpose
-    line(cash[2], "11/3", "cash - rcpt #214", { amount: "$1,525", conf: { amount: 0.58 } }),
+    line(cash[0], 11, 5, "cash"), line(cash[1], 11, 5, "money order"),
+    // the 5 is written like an 8 -> low confidence on purpose
+    line(cash[2], 11, 5, "cash - rcpt #214", { conf: { amount: 0.58 } }),
   ], 8, 2026);
   const fixture = { note: "Demo-provider fixtures: what a vision model returns for the sample ledger scans.", images: [p1, p2] };
   fs.writeFileSync(path.join(FIXTURES, "ledgers.json"), JSON.stringify(fixture, null, 2) + "\n");

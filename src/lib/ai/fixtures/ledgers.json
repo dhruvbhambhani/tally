@@ -2,7 +2,7 @@
   "note": "Demo-provider fixtures: what a vision model returns for the sample ledger scans.",
   "images": [
     {
-      "sha256": "95a58cf5da73f93937abc211f8f825c09b7a585da862353f25a995f7f714a8e4",
+      "sha256": "ff3a30efd263bcaccc1ff7ff02542b98b322c610f734dfece20b5ff8613aebb9",
       "fileName": "ledger_page_1.jpg",
       "title": "Maple Ct. - cash receipts  Sept / Oct 2026",
       "rows": [
@@ -15,8 +15,8 @@
           },
           "cells": {
             "date": {
-              "value": "2026-09-02",
-              "raw": "9/2",
+              "value": "2026-09-04",
+              "raw": "9/4",
               "confidence": 0.94
             },
             "unit": {
@@ -85,8 +85,8 @@
           },
           "cells": {
             "date": {
-              "value": "2026-09-03",
-              "raw": "9/3",
+              "value": "2026-09-02",
+              "raw": "9/2",
               "confidence": 0.94
             },
             "unit": {
@@ -120,8 +120,8 @@
           },
           "cells": {
             "date": {
-              "value": "2026-10-02",
-              "raw": "10/2",
+              "value": "2026-10-03",
+              "raw": "10/3",
               "confidence": 0.94
             },
             "unit": {
@@ -155,8 +155,8 @@
           },
           "cells": {
             "date": {
-              "value": "2026-10-01",
-              "raw": "10/1",
+              "value": "2026-10-04",
+              "raw": "10/4",
               "confidence": 0.94
             },
             "unit": {
@@ -190,8 +190,8 @@
           },
           "cells": {
             "date": {
-              "value": "2026-10-03",
-              "raw": "10/3",
+              "value": "2026-10-01",
+              "raw": "10/1",
               "confidence": 0.94
             },
             "unit": {
@@ -219,7 +219,7 @@
       ]
     },
     {
-      "sha256": "cb9ad8505e77d943c21b1a4fde3e71c369495fa611a804956d8ed179a8d90420",
+      "sha256": "612ee94a439bb19671889781fdae44ddaaa25fabfd14cc461870879afc3cc68a",
       "fileName": "ledger_page_2.jpg",
       "title": "Maple Ct. - cash receipts  Nov 2026",
       "rows": [
@@ -267,8 +267,8 @@
           },
           "cells": {
             "date": {
-              "value": "2026-11-01",
-              "raw": "11/1",
+              "value": "2026-11-03",
+              "raw": "11/3",
               "confidence": 0.94
             },
             "unit": {
@@ -302,8 +302,8 @@
           },
           "cells": {
             "date": {
-              "value": "2026-11-03",
-              "raw": "11/3",
+              "value": "2026-11-04",
+              "raw": "11/4",
               "confidence": 0.94
             },
             "unit": {
