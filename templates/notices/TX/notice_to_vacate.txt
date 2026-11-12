@@ -1,0 +1,24 @@
+*** SAMPLE — have your attorney review before use. ***
+This template is not legal advice. Notice requirements vary by state, city, lease and housing program.
+
+{{title}}
+(Texas)
+
+Date: {{date}}
+
+To: {{residents}}
+Premises: Unit {{unit}}, {{property_name}}, {{property_address}}
+
+You have not paid rent as required by your lease. The unpaid amount is {{amount}}, itemized as follows:
+
+{{itemized}}
+{{excluded_note}}
+You are notified to vacate the premises within {{days}} days after this notice is delivered to you. If you do not vacate by then, the landlord may file an eviction suit in justice court.
+
+If you pay the full amount stated above before that date, contact the landlord right away to discuss whether this notice will be withdrawn.
+
+{{assistance_note}}
+
+Landlord / Agent: {{owner_name}}
+Delivered by (circle): personal delivery / mail / posted on inside of main entry door
+Date delivered: ____________________

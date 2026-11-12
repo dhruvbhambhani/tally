@@ -1,0 +1,22 @@
+*** SAMPLE — have your attorney review before use. ***
+This template is not legal advice. Notice requirements vary by state, city, lease and housing program.
+
+{{title}}
+
+Date: {{date}}
+
+To: {{residents}}
+Premises: Unit {{unit}}, {{property_name}}, {{property_address}}
+
+You are notified that rent for the premises is past due in the amount of {{amount}}, itemized as follows:
+
+{{itemized}}
+{{excluded_note}}
+You are asked to vacate the premises within {{days}} days after this notice is delivered to you. If you do not vacate by then, the landlord may file an eviction suit.
+
+Paying the full amount stated above before that date may resolve this notice; contact the landlord right away.
+
+{{assistance_note}}
+
+Landlord / Agent: {{owner_name}}
+Delivered by: ____________________   Date delivered: ____________________

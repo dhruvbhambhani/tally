@@ -141,6 +141,84 @@ describe("delinquency", () => {
   });
 });
 
+describe("recommendations", () => {
+  it("surfaces the seeded opportunities with computed $ impact", async () => {
+    const { availableRevenue, buildRecInput, runRecommendations } = await import("@/lib/recs/engine");
+    const recs = runRecommendations(buildRecInput(data, a));
+    const rec = (id: string) => recs.find((r) => r.id === id)!;
+    // 6 below-market renewals due in 90 days: +90 +90 +110 +100 +70 +50 (8% max increase, never above market)
+    expect(rec("renewals_below_market")).toMatchObject({ units: ["101", "202", "206", "309", "312", "410"], monthly: $(510) });
+    // the unbilled $35 pet fee in unit 108's lease
+    expect(rec("unbilled_charges")).toMatchObject({ units: ["108"], monthly: $(35), yearly: $(420) });
+    // 211 premium 100 + 302 +75 + 405 +50
+    expect(rec("month_to_month")).toMatchObject({ units: ["211", "302", "405"], monthly: $(225) });
+    // 307 (47 days) and 411 (83 days); 204 has only been empty 12 days
+    expect(rec("long_vacancy")).toMatchObject({ units: ["307", "411"], monthly: $(3250) });
+    // Sep–Nov: 17 late months, fee charged twice → 15 missed × $50 ÷ 3
+    expect(rec("late_fees_uniform").monthly).toBe($(250));
+    expect(rec("deposit_shortfall")).toMatchObject({ units: ["306"], oneTime: $(450) });
+    expect(rec("concession_burnoff")).toMatchObject({ units: ["105", "209"], monthly: $(300), kind: "protect" });
+    expect(rec("subsidy_mismatch").units).toEqual(["407"]);
+    expect(rec("expiration_clustering").math[0]).toContain("Jun 2027: 9 of 48 units");
+    // (510 + 35 + 225 + 3,250 + 250) × 12
+    expect(availableRevenue(recs)).toEqual({ monthly: $(4270), yearly: $(51240), oneTime: $(450) });
+  });
+});
+
+describe("Ask Tally", () => {
+  it("answers from the query functions and cites rows", async () => {
+    const { ask } = await import("@/lib/ask/tools");
+    const late = await ask("Who's paid late 3+ times this year?", data, a);
+    expect(late.tool).toBe("late_payers");
+    expect(late.text).toContain("4 residents have paid late 3+ times");
+    for (const unit of ["201", "305", "310", "412"]) expect(late.text).toContain(`unit ${unit}`);
+    expect(late.citations[0].href).toContain("units=");
+    const ltl = await ask("What's my loss-to-lease at Maple Court?", data, a);
+    expect(ltl.text).toContain("$1,815 a month");
+  });
+  it('says "I don\'t know" when the data can\'t answer', async () => {
+    const { ask } = await import("@/lib/ask/tools");
+    const r = await ask("What will interest rates do next year?", data, a);
+    expect(r.tool).toBeNull();
+    expect(r.text).toMatch(/^I don't know/);
+  });
+});
+
+describe("letters", () => {
+  it("generates a friendly letter PDF from the resident's actual ledger", async () => {
+    const { writeLetter } = await import("@/lib/delinquency/letters");
+    const { letterPdf } = await import("@/lib/pdf/documents");
+    const lease = data.snapshot.leases.find((l) => data.unitNumberOf(l.id) === "103")!;
+    const letter = await writeLetter({
+      type: "friendly_reminder", channel: "letter", language: "en", asOf: a.asOf, propertyName: data.property.name, ownerName: "Owner",
+      unitNumber: "103", residents: lease.residents, aging: a.agingByLease.get(lease.id)!, lastPayment: null, planMonths: 3,
+      assistanceText: data.settings.rentalAssistanceText,
+    });
+    expect(letter.body).toContain("Hi Darnell,");
+    expect(letter.body).toContain("$1,850.00");
+    const pdf = await letterPdf(letter.body);
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1500);
+  });
+  it("formal notice for a Texas resident: 30 days while CARES status is unknown, unauthorized late fee left out", async () => {
+    const { buildFormalNotice } = await import("@/lib/delinquency/notices");
+    const lease = data.snapshot.leases.find((l) => data.unitNumberOf(l.id) === "103")!;
+    const n = buildFormalNotice({
+      state: data.property.state, type: "notice_to_vacate", cares: data.property.caresCovered, asOf: a.asOf,
+      property: data.property, unitNumber: "103", residents: lease.residents, aging: a.agingByLease.get(lease.id)!,
+      lateFeeAuthorized: lease.lateFeeAuthorized, ownerName: "Owner", assistanceText: data.settings.rentalAssistanceText,
+    });
+    expect(data.property.caresCovered).toBe("unknown");
+    expect(n).toMatchObject({ days: 30, amount: $(1800), excludedLateFees: $(50), templateState: "TX" });
+    expect(n.check.needsConfirmation).toBe(true);
+  });
+  it("exports the rent roll as PDF", async () => {
+    const { rentRollPdf } = await import("@/lib/pdf/documents");
+    const pdf = await rentRollPdf(data.property.name, a.asOf, a.rentRoll);
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+});
+
 describe("data health", () => {
   it("counts conflicts, unmatched deposits and review items", () => {
     const h = dataHealth(db, SAMPLE_PROPERTY_ID);

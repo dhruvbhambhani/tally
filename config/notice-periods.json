@@ -1,0 +1,16 @@
+{
+  "_note": "SAMPLE values for the demo. Notice periods vary by state, city, lease terms and housing program, and they change. Have your attorney confirm every number here before you rely on it. Tally reads notice periods ONLY from this file - never from code or from an AI prompt.",
+  "caresMinimumDays": 30,
+  "states": {
+    "DEFAULT": {
+      "pay_or_quit": { "days": 3, "title": "Notice to Pay Rent or Quit" },
+      "notice_to_vacate": { "days": 3, "title": "Notice to Vacate for Nonpayment of Rent" }
+    },
+    "TX": {
+      "notice_to_vacate": { "days": 3, "title": "Notice to Vacate for Nonpayment of Rent" }
+    },
+    "CA": {
+      "pay_or_quit": { "days": 3, "title": "Three-Day Notice to Pay Rent or Quit" }
+    }
+  }
+}

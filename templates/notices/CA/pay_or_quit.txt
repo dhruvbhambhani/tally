@@ -1,0 +1,23 @@
+*** SAMPLE — have your attorney review before use. ***
+This template is not legal advice. Notice requirements vary by state, city, lease and housing program.
+
+{{title}}
+(California)
+
+Date: {{date}}
+
+To: {{residents}}, and all others in possession
+Premises: Unit {{unit}}, {{property_name}}, {{property_address}}
+
+Within {{days}} days after service of this notice (not counting Saturdays, Sundays and judicial holidays), you must pay the past-due rent of {{amount}}, itemized below, or deliver possession of the premises to the landlord.
+
+{{itemized}}
+{{excluded_note}}
+Payment may be made to: {{owner_name}}  Phone: ____________  Address: ____________________
+Days and hours payment is accepted: ____________________
+
+If you fail to pay or to deliver possession, the landlord may begin legal proceedings to recover possession, the unpaid rent and any other amounts allowed by law.
+
+{{assistance_note}}
+
+Landlord / Agent: {{owner_name}}
