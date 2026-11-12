@@ -80,7 +80,7 @@ export class DemoProvider implements AIProvider {
     if (req.task === "ledger_image") {
       const hit = fixtures.images.find((i) => i.sha256 === req.sha256) ?? fixtures.images.find((i) => i.fileName === req.fileName);
       if (!hit) {
-        return { task: "ledger_image", rows: [], note: "Demo mode can only read the bundled sample scans. Add an API key to read your own handwriting." } as Out;
+        return { task: "ledger_image", rows: [], note: "Demo mode can only read the bundled sample scans. Add an API key to read your own handwriting." } as unknown as Out;
       }
       // fixtures store dollars as written; the provider contract is integer cents
       const rows = (hit.rows as unknown as LedgerRow[]).map((r) => ({
