@@ -165,7 +165,7 @@ export async function ask(question: string, data: PropertyData, a: Analysis): Pr
   if (!q) return { text: DONT_KNOW, citations: [], tool: null };
   let routed: { tool: string | null; args: Record<string, string | number> };
   try {
-    routed = await getProvider().extract({ task: "ask_intent", question: q, tools: TOOLS.map(({ name, description, params }) => ({ name, description, params })) });
+    routed = await (await getProvider()).extract({ task: "ask_intent", question: q, tools: TOOLS.map(({ name, description, params }) => ({ name, description, params })) });
   } catch {
     return { text: "I couldn't reach the AI provider to understand that question. Nothing was guessed.", citations: [], tool: null };
   }

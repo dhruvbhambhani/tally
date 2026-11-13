@@ -1,12 +1,62 @@
 # Tally
 
-AI rent roll for owners who live in spreadsheets, PDFs and paper ledgers.
+Free, open-source rent roll for owners who live in spreadsheets, PDFs and paper ledgers. MIT licensed. No accounts, no subscription, no telemetry.
 
-Tally reads whatever an owner of 5–500 units already has — property-management exports, Excel/Google Sheets, bank and payment-app statements, lease PDFs, photos of handwritten ledgers — and builds one clean, verified rent roll. It explains the numbers in plain English, ranks specific ways to earn more (each with a dollar figure), and manages delinquencies, including letters the owner reviews before anything goes out.
+Tally reads whatever an owner of 5–500 units already has — property-management exports, Excel and Google Sheets, bank and payment-app statements, lease PDFs, photos of handwritten ledgers — and builds one clean, verified rent roll. It explains the numbers in plain English, ranks specific ways to earn more (each with a dollar figure), and manages delinquencies, including letters the owner reviews before anything goes out.
 
-Live demo: https://tally-rent-roll.vercel.app (loads the fictional 48-unit "Maple Court").
+Try the demo: https://tally-rent-roll.vercel.app (the fictional 48-unit "Maple Court"; anything you add there is private to your browser and temporary).
 
 > **Not legal or financial advice.** See [What is and isn't legal advice](#what-is-and-isnt-legal-advice).
+
+## Run your own copy
+
+Tally is meant to run on your own computer or server, so your rent roll never leaves it.
+
+**With Node.js 20 or newer**
+
+```bash
+git clone https://github.com/dhruvbhambhani/tally.git
+cd tally
+npm install
+npm run build
+npm start
+```
+
+Open http://localhost:3000 and choose **Add your data**. Everything is stored in the `data` folder (one SQLite file plus your uploads). Back up by copying that folder.
+
+**With Docker**
+
+```bash
+docker compose up -d
+```
+
+The database and uploads live in the `tally-data` volume.
+
+**Before you put it on a network:** there are no logins. Anyone who can reach the app can see the data. Run it on your own machine, or put it behind your own login or VPN. See [SECURITY.md](SECURITY.md).
+
+## Getting your data in
+
+| You have | Do this |
+| --- | --- |
+| AppFolio, Buildium, Yardi, Rent Manager, RealPage, Entrata | Export the rent roll report as CSV or Excel and drop it in. Tally recognizes their column names and remembers any mapping you correct. |
+| Excel or CSV you keep yourself | Drop it in. Any column names — fix the mapping once and it's remembered. |
+| Google Sheets | Paste the sheet's link (shared as "Anyone with the link can view"). Press **Refresh** on the file any time to pull in changes. |
+| A CSV or Excel file at a web address | Paste the https link. |
+| Bank, Zelle, Venmo, Cash App | Download the month's activity as CSV. Deposits are matched to residents by name, memo and amount. |
+| Lease PDFs | Drop them in. Rent, dates, deposit, fees, late-fee and renewal terms are abstracted. |
+| Paper ledgers and receipt books | **Scan a page** takes a photo on a phone, or drop in image files. Needs an AI key. |
+
+Tally does not log in to your software or your bank. Direct API connections to property-management systems are not included: those vendors require partner agreements, so exports and links are the supported route.
+
+## Your own AI key (optional)
+
+Tally works with no key: spreadsheets, CSVs and bank statements are parsed directly, plainly worded leases are read by pattern matching, letters use built-in templates, and Ask Tally routes questions by keyword.
+
+Add your own key in **Settings → Your AI key** to also read handwriting and unusual leases and to polish letter wording. OpenAI and xAI keys are supported.
+
+- The key is checked with the provider, then kept in an httpOnly cookie in your browser. It is not written to the database and is never shown again.
+- It is sent only to the provider you chose. You pay them directly for what you use.
+- A self-hosted install can instead set one key for everyone with `OPENAI_API_KEY` or `XAI_API_KEY`.
 
 ## Core principle: AI reads and writes words; code does the math
 
@@ -15,39 +65,37 @@ Live demo: https://tally-rent-roll.vercel.app (loads the fictional 48-unit "Mapl
 - Generated text is checked: if a letter contains a dollar figure that isn't one of the computed facts, the text is discarded and the template is used (`figuresAreGrounded` in `src/lib/ai/provider.ts`).
 - Every extracted value keeps provenance (source file, row / page / image region, confidence). Low-confidence values go to a review queue. Sources that disagree raise a conflict that is never auto-resolved.
 
-## Setup
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000, choose **Add your data**, then **Try it with sample files** (or drop in your own). No API key or database setup is needed: SQLite is created at `data/tally.db` and uploads are stored in `data/uploads`.
-
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the app |
-| `npm test` | Unit tests + end-to-end pipeline test (98 tests) |
-| `npm run build` | Production build |
+| `npm run dev` | Start the app in development |
+| `npm test` | Unit tests + end-to-end pipeline test |
+| `npm run build` / `npm start` | Production build and server |
 | `npm run sample:generate` | Regenerate the Maple Court sample files |
 | `npx drizzle-kit generate` | Create a migration after changing `src/lib/db/schema.ts` |
 
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Environment variables
 
-All optional.
+All optional. See `.env.example`.
 
 | Variable | Purpose |
 | --- | --- |
-| `OPENAI_API_KEY` | Use OpenAI for extraction and wording |
-| `XAI_API_KEY` | Use xAI instead (OpenAI-compatible API) |
+| `OPENAI_API_KEY` / `XAI_API_KEY` | A server-wide AI key (a key entered in Settings takes priority) |
 | `TALLY_AI_MODEL` | Model name (default `gpt-4o` / `grok-4`) |
 | `OPENAI_BASE_URL`, `XAI_BASE_URL` | Override the API base URL |
-| `TALLY_AI_PROVIDER=demo` | Force the demo provider even if a key is set |
+| `TALLY_AI_PROVIDER=demo` | Never call a model, even if a key is set |
 | `TALLY_DATA_DIR` | Where the database and uploads live (default `./data`) |
 | `TALLY_DB_PATH` | Database file (default `<data dir>/tally.db`) |
-| `TALLY_DEMO_SEED=1` | Load Maple Court automatically on first request |
-
-**Without a key** the demo provider runs: spreadsheets, CSVs and bank statements are parsed directly; plainly worded leases are abstracted by pattern matching; the two bundled ledger scans return recorded fixtures; letters use the built-in templates; Ask Tally routes questions by keyword. New handwriting and unusually worded leases need a real provider.
+| `TALLY_SHARED=1` | Public-demo mode: an isolated, temporary workspace per browser, pre-loaded with the sample. On automatically on Vercel; `TALLY_SHARED=0` turns it off there |
+| `TALLY_DEMO_SEED=1` | Load Maple Court on first use of a self-hosted install |
 
 ## How it works
 
@@ -140,8 +188,9 @@ The end-to-end test (`tests/e2e/pipeline.test.ts`) imports these files and check
 - **shadcn/ui** components are hand-written in `src/components/ui` in the shadcn style on Radix primitives rather than generated by the CLI.
 - **Rent-roll tables inside PDFs** are detected but not parsed; export CSV or Excel instead.
 - **Ask Tally** routes each question to one tested query function and cites rows; it does not hold a multi-turn conversation.
-- **Hosted demo**: serverless hosts only allow writes to a temporary folder, so the Vercel deployment re-loads Maple Court on each cold start and changes made there don't persist. Run locally for real use.
-- **Single owner, single active property.** The schema supports several properties; the screens show the one with a built rent roll.
+- **Hosted demo**: on a shared host every browser gets its own private workspace (a random cookie, a separate SQLite file) pre-loaded with the sample. Serverless hosts only allow writes to a temporary folder, so that data is cleared from time to time. It is a demo, not a place to keep a rent roll.
+- **No accounts.** One install is one owner's workspace with as many properties as they like; pick the active one in the header or in Settings. Multi-user logins are not built.
+- **Uploads** are capped at 25 MB per file (about 4 MB on Vercel, which limits request size).
 
 ## Stack
 

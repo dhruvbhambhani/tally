@@ -1,0 +1,12 @@
+services:
+  tally:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - tally-data:/data # the database and uploaded files; back this up
+    restart: unless-stopped
+    # environment:
+    #   OPENAI_API_KEY: sk-... # optional server-wide key
+volumes:
+  tally-data:

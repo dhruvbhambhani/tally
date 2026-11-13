@@ -1,11 +1,13 @@
-import { redirect } from "next/navigation";
-import { updateSettings } from "@/app/actions";
+import { createProperty, deleteProperty, updateSettings } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { getProvider } from "@/lib/ai/provider";
-import { getContext } from "@/lib/context";
+import { getProperties } from "@/lib/context";
 import { availableNotices, loadNoticeConfig } from "@/lib/delinquency/notices";
+import { aiKey, SHARED_HOST } from "@/lib/session";
+import { resolveSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import { AiKeyForm, EraseEverything, PropertySwitch } from "./parts";
 
 export const dynamic = "force-dynamic";
 
@@ -34,26 +36,45 @@ function Section({ id, title, blurb, children }: { id: string; title: string; bl
 
 export default async function SettingsPage(props: PageProps<"/settings">) {
   const sp = await props.searchParams;
-  const ctx = await getContext();
-  if (!ctx) redirect("/");
-  const { property: p } = ctx.data;
-  const s = ctx.data.settings;
-  const notices = availableNotices(p.state);
+  const { all, current: p } = await getProperties();
+  const s = resolveSettings(p?.settings);
+  const notices = availableNotices(p?.state ?? "");
+  const own = await aiKey();
   const cfg = loadNoticeConfig();
-  const provider = getProvider();
+  const provider = await getProvider();
 
   return (
-    <form action={updateSettings} className="mx-auto max-w-[1440px] px-6 py-14 lg:px-10">
+    <div className="mx-auto max-w-[1440px] px-6 py-14 lg:px-10">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <p className="text-sm text-muted">Settings</p>
-          <h1 className="mt-2 text-5xl font-semibold tracking-tight sm:text-6xl">{p.name}</h1>
+          <h1 className="mt-2 text-5xl font-semibold tracking-tight sm:text-6xl">{p?.name ?? "Settings"}</h1>
           {sp.saved ? <p className="mt-3 text-sm text-accent" role="status">Saved.</p> : null}
+          {sp.deleted ? <p className="mt-3 text-sm text-accent" role="status">Property deleted.</p> : null}
         </div>
-        <Button type="submit" variant="primary" size="lg">Save changes</Button>
+        {p ? <Button type="submit" form="settings-form" variant="primary" size="lg">Save changes</Button> : null}
       </div>
 
       <div className="mt-10">
+        <section id="ai" className="grid scroll-mt-24 gap-6 border-t border-line py-10 lg:grid-cols-[300px_1fr]">
+          <div>
+            <h2 className="text-lg font-semibold">Your AI key</h2>
+            <p className="mt-1 text-sm text-muted">Optional. Tally is free; with your own key it can also read handwriting and unusual leases, and polish letters.</p>
+          </div>
+          <div className="max-w-[760px]">
+            <AiKeyForm
+              current={own ? { provider: own.provider, last4: own.apiKey.slice(-4), model: own.model ?? "" } : null}
+              serverKey={!own && !provider.demo ? provider.name : null}
+            />
+            <ul className="mt-5 list-disc space-y-1 pl-5 text-[13px] text-muted">
+              <li>Your key stays in this browser as a secure cookie. It is not saved in Tally&apos;s database and is never shown again.</li>
+              <li>It is sent only to the provider you choose, and only when Tally reads a file, routes a question or words a letter. You pay that provider directly for what you use.</li>
+              <li>AI reads documents and writes words. It never calculates a number.</li>
+            </ul>
+          </div>
+        </section>
+
+        {p ? <form id="settings-form" action={updateSettings}>
         <Section id="property" title="Property" blurb="Used on letters and to pick the right notice templates.">
           <Field label="Name"><input name="name" defaultValue={p.name} className={input} /></Field>
           <Field label="Your name (signs letters)"><input name="ownerName" defaultValue={s.ownerName} className={input} /></Field>
@@ -138,11 +159,56 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
           <Field label="Flag a month when more than (%) of leases end"><input name="expirationFlagPct" defaultValue={Math.round(s.expirationFlagShare * 100)} className={cn(input, "w-[90px]")} /></Field>
         </Section>
 
-        <section className="border-t border-line py-10 text-sm text-muted">
-          AI provider: <span className="font-medium text-ink">{provider.demo ? "Demo (no API key)" : provider.name}</span>.{" "}
-          {provider.demo ? "Tally is reading files with built-in rules and writing letters from templates. Add OPENAI_API_KEY or XAI_API_KEY to read new handwriting and unusual leases." : "AI reads documents and words letters. It never calculates a number."}
+        </form> : null}
+
+        <section id="properties" className="grid scroll-mt-24 gap-6 border-t border-line py-10 lg:grid-cols-[300px_1fr]">
+          <div>
+            <h2 className="text-lg font-semibold">Your properties</h2>
+            <p className="mt-1 text-sm text-muted">Each property has its own files, rent roll and settings.</p>
+          </div>
+          <div className="max-w-[760px] text-sm">
+            {all.length ? (
+              <ul className="divide-y divide-line border-y border-line">
+                {all.map((x) => (
+                  <li key={x.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <span><span className="font-medium">{x.name}</span> <span className="text-muted">· {x.unitCount ? `${x.unitCount} units` : "no rent roll yet"}{x.id === p?.id ? " · showing now" : ""}</span></span>
+                    <span className="flex items-center gap-2">
+                      {x.id !== p?.id ? <PropertySwitch id={x.id} /> : null}
+                      <details className="relative">
+                        <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-[13px] text-muted hover:bg-wash hover:text-ink">Delete</summary>
+                        <form action={deleteProperty} className="fade-in absolute right-0 z-10 mt-1 w-[280px] rounded-xl border border-line bg-white p-4 shadow-lg">
+                          <input type="hidden" name="id" value={x.id} />
+                          <p className="text-[13px] text-muted">Delete {x.name} and all of its files, letters and settings? This can&apos;t be undone.</p>
+                          <Button type="submit" size="sm" className="mt-3 border-danger text-danger hover:bg-danger-soft">Delete {x.name}</Button>
+                        </form>
+                      </details>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-muted">No properties yet. Add one here, or just drop files on the Add data page.</p>}
+            <form action={createProperty} className="mt-5 flex flex-wrap items-end gap-3">
+              <Field label="Add a property"><input name="name" required maxLength={80} placeholder="e.g. Oak Street Apartments" className={cn(input, "w-[300px]")} /></Field>
+              <Button type="submit">Add property</Button>
+            </form>
+          </div>
+        </section>
+
+        <section id="data" className="grid scroll-mt-24 gap-6 border-t border-line py-10 lg:grid-cols-[300px_1fr]">
+          <div>
+            <h2 className="text-lg font-semibold">Your data</h2>
+            <p className="mt-1 text-sm text-muted">Where it lives and how to remove it.</p>
+          </div>
+          <div className="max-w-[760px] text-sm text-muted">
+            <p>
+              {SHARED_HOST
+                ? "This is the public demo. Your files are kept in a private, temporary workspace tied to this browser — other visitors can't see them — and they are cleared from time to time. To keep your data, run your own copy of Tally: it's free and open source."
+                : "Everything is stored on this computer, in the data folder next to the app (a single SQLite file plus your uploaded files). Back it up by copying that folder."}
+            </p>
+            <EraseEverything />
+          </div>
         </section>
       </div>
-    </form>
+    </div>
   );
 }

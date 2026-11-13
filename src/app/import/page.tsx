@@ -2,15 +2,14 @@ import { eq } from "drizzle-orm";
 import { CircleCheck } from "lucide-react";
 import { Hint } from "@/components/ui/hint";
 import { getProvider } from "@/lib/ai/provider";
-import { listProperties } from "@/lib/data/load";
-import { ensureDemoSeed } from "@/lib/data/sample";
+import { getProperties } from "@/lib/context";
 import { formatDate } from "@/lib/dates";
-import { getDb } from "@/lib/db/client";
 import { conflicts, payments, sourceFiles, stagedRows, units } from "@/lib/db/schema";
 import { KIND_LABELS, type FileKind, type TableMeta } from "@/lib/ingest/stage";
 import { FIELD_LABELS, fieldsForKind } from "@/lib/ingest/tabular";
 import { money } from "@/lib/money";
-import { BuildButton, ConflictCard, DepositCard, DropZone, MappingEditor, ReviewCard, type ReviewItem } from "./parts";
+import { SHARED_HOST } from "@/lib/session";
+import { BuildButton, ConflictCard, DepositCard, DropZone, FileActions, LinkImport, MappingEditor, ReviewCard, type ReviewItem } from "./parts";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +23,7 @@ function show(field: string, value: unknown): string {
 }
 
 export default async function ImportPage() {
-  await ensureDemoSeed();
-  const db = getDb();
-  const all = listProperties(db);
-  const property = all.find((p) => p.unitCount > 0) ?? all[0] ?? null;
+  const { db, current: property } = await getProperties();
   const pid = property?.id ?? "";
   const files = pid ? db.select().from(sourceFiles).where(eq(sourceFiles.propertyId, pid)).all().sort((a, b) => a.name.localeCompare(b.name)) : [];
   const fileById = new Map(files.map((f) => [f.id, f]));
@@ -37,7 +33,7 @@ export default async function ImportPage() {
   const unmatched = pid ? db.select().from(payments).where(eq(payments.propertyId, pid)).all().filter((p) => !p.leaseId) : [];
   const built = pid ? db.select().from(units).where(eq(units.propertyId, pid)).all().length > 0 : false;
   const toReview = review.length + openConflicts.length + unmatched.length;
-  const demo = getProvider().demo;
+  const demo = (await getProvider()).demo;
 
   const items: ReviewItem[] = review.map((r) => {
     const file = fileById.get(r.sourceFileId)!;
@@ -57,7 +53,7 @@ export default async function ImportPage() {
 
   return (
     <div className="mx-auto max-w-[1440px] px-6 py-14 lg:px-10">
-      <p className="text-sm text-muted">Add your data</p>
+      <p className="text-sm text-muted">Add your data{property ? ` · ${property.name}` : ""}</p>
       {files.length ? (
         <h1 className="mt-2 text-5xl font-semibold tracking-tight sm:text-6xl">
           <span className="num">{toReview}</span> <span className="text-muted font-normal text-3xl sm:text-4xl">{toReview === 1 ? "thing" : "things"} to check</span>
@@ -71,7 +67,21 @@ export default async function ImportPage() {
           : "Rent roll exports, spreadsheets, bank statements, leases, photos of ledgers. Mix them — Tally sorts out which is which."}
       </p>
 
-      <div className="mt-10"><DropZone hasFiles={files.length > 0} demo={demo} /></div>
+      <div className="mt-10"><DropZone hasFiles={files.length > 0} demo={demo} maxMb={SHARED_HOST ? 4 : 25} /></div>
+      <LinkImport />
+      <details className="group mt-4 max-w-[80ch] text-sm">
+        <summary className="cursor-pointer list-none font-medium underline-offset-4 hover:underline">How do I get my data out of my software?</summary>
+        <div className="fade-in mt-3 space-y-2 text-muted">
+          <p>Export your rent roll as CSV or Excel and drop it here. Tally recognizes the column names these programs use and remembers any you correct.</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li><span className="text-ink">AppFolio, Buildium, Yardi, Rent Manager, RealPage, Entrata</span>: run the rent roll report and export it as CSV or Excel.</li>
+            <li><span className="text-ink">Bank, Zelle, Venmo, Cash App</span>: download the month&apos;s activity as CSV.</li>
+            <li><span className="text-ink">Google Sheets</span>: paste the sheet&apos;s link above, and refresh it any time to pull in changes.</li>
+            <li><span className="text-ink">Paper</span>: take a photo of each ledger or receipt-book page.</li>
+          </ul>
+          <p>Tally doesn&apos;t log in to these programs for you. Nothing is fetched except the links you paste.</p>
+        </div>
+      </details>
 
       {files.length ? (
         <>
@@ -89,6 +99,7 @@ export default async function ImportPage() {
                       <span className="min-w-[260px] flex-1 font-medium">{f.name}</span>
                       <span className="w-[230px] text-sm text-muted">{KIND_LABELS[f.kind as FileKind] ?? f.kind}</span>
                       <span className="num w-[110px] text-right text-sm text-muted">{f.status === "parsed" ? `${rows} ${rows === 1 ? "record" : "records"}` : "Not read"}</span>
+                      <FileActions fileId={f.id} name={f.name} linked={!!f.meta.link} />
                     </div>
                     {note && f.status !== "parsed" ? <p className="mt-1 pl-10 text-sm text-muted">{note}</p> : null}
                     {tables.length ? (

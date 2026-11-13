@@ -1,6 +1,6 @@
 /** Read the canonical tables into the pure domain objects the metric functions take. */
 import { eq } from "drizzle-orm";
-import { getDb, type DB } from "../db/client";
+import type { DB } from "../db/client";
 import {
   charges, conflicts, fieldProvenance, leases, notices, payments, promises, properties, sourceFiles, stagedRows, units,
 } from "../db/schema";
@@ -25,14 +25,14 @@ export interface PropertyData {
   unmatched: PaymentRow[];
 }
 
-export function listProperties(db: DB = getDb()): PropertyRow[] {
-  return db.select().from(properties).all();
+export function listProperties(db: DB): PropertyRow[] {
+  return db.select().from(properties).all().sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** The property that has a built rent roll, if any. */
-export function primaryProperty(db: DB = getDb()): PropertyRow | null {
+/** The property the screens show: the one the owner picked, else the first with a built rent roll. */
+export function primaryProperty(db: DB, preferredId?: string | null): PropertyRow | null {
   const all = listProperties(db);
-  return all.find((p) => p.unitCount > 0) ?? all[0] ?? null;
+  return all.find((p) => p.id === preferredId) ?? all.find((p) => p.unitCount > 0) ?? all[0] ?? null;
 }
 
 export function loadProperty(db: DB, propertyId: string): PropertyData | null {

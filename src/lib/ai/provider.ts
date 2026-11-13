@@ -6,6 +6,7 @@
  */
 import { DemoProvider } from "./demo";
 import { OpenAICompatibleProvider } from "./openai";
+import { aiKey } from "../session";
 
 export interface Cell<T = string | number | null> {
   value: T;
@@ -58,20 +59,35 @@ export interface AIProvider {
   generate(req: GenerateRequest): Promise<string>;
 }
 
-export function getProvider(): AIProvider {
+export const DEFAULT_MODELS = { openai: "gpt-4o", xai: "grok-4" } as const;
+export const BASE_URLS = { openai: "https://api.openai.com/v1", xai: "https://api.x.ai/v1" } as const;
+
+/**
+ * Which provider handles this request:
+ *  1. the visitor's own key (entered in Settings, held in an httpOnly cookie)
+ *  2. a server-wide key from the environment (self-hosted installs)
+ *  3. the demo provider — no model is called
+ */
+export async function getProvider(): Promise<AIProvider> {
   if (process.env.TALLY_AI_PROVIDER === "demo") return new DemoProvider();
+  const own = await aiKey();
+  if (own) {
+    return new OpenAICompatibleProvider({
+      name: own.provider, apiKey: own.apiKey,
+      baseUrl: (own.provider === "openai" ? process.env.OPENAI_BASE_URL : process.env.XAI_BASE_URL) ?? BASE_URLS[own.provider],
+      model: own.model || DEFAULT_MODELS[own.provider],
+    });
+  }
   if (process.env.OPENAI_API_KEY) {
     return new OpenAICompatibleProvider({
       name: "openai", apiKey: process.env.OPENAI_API_KEY,
-      baseUrl: process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
-      model: process.env.TALLY_AI_MODEL ?? "gpt-4o",
+      baseUrl: process.env.OPENAI_BASE_URL ?? BASE_URLS.openai, model: process.env.TALLY_AI_MODEL ?? DEFAULT_MODELS.openai,
     });
   }
   if (process.env.XAI_API_KEY) {
     return new OpenAICompatibleProvider({
       name: "xai", apiKey: process.env.XAI_API_KEY,
-      baseUrl: process.env.XAI_BASE_URL ?? "https://api.x.ai/v1",
-      model: process.env.TALLY_AI_MODEL ?? "grok-4",
+      baseUrl: process.env.XAI_BASE_URL ?? BASE_URLS.xai, model: process.env.TALLY_AI_MODEL ?? DEFAULT_MODELS.xai,
     });
   }
   return new DemoProvider();

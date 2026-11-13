@@ -1,63 +1,122 @@
 "use server";
 
 import crypto from "node:crypto";
+import fs from "node:fs";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { BASE_URLS, DEFAULT_MODELS } from "@/lib/ai/provider";
 import { ask as askTally, type Answer } from "@/lib/ask/tools";
-import { getContext } from "@/lib/context";
-import { listProperties } from "@/lib/data/load";
-import { ensureProperty, importSampleData } from "@/lib/data/sample";
+import { getContext, getProperties, getReadyDb } from "@/lib/context";
+import { ensureProperty, importSampleData, SAMPLE_PROPERTY_ID } from "@/lib/data/sample";
 import { parseDate } from "@/lib/dates";
-import { getDb } from "@/lib/db/client";
-import { conflicts, notices, promises, properties, resolutions, stagedRows, units } from "@/lib/db/schema";
+import { wipeDb, type DB } from "@/lib/db/client";
+import {
+  charges, comps, conflicts, fieldProvenance, leases, notices, payments, promises, properties, resolutions, sourceFiles, stagedRows, units,
+} from "@/lib/db/schema";
 import { writeLetter, type Channel, type FriendlyType, type Language } from "@/lib/delinquency/letters";
 import { buildFormalNotice, type FormalNoticeType } from "@/lib/delinquency/notices";
+import { fetchLinkedFile, MAX_IMPORT_BYTES, normalizeImportUrl } from "@/lib/ingest/link";
 import { ingestFile, remapTable, type IngestResult } from "@/lib/ingest/stage";
 import { parseMoney } from "@/lib/money";
 import { buildRentRoll } from "@/lib/reconcile/build";
+import { AI_COOKIE, cookieOptions, PROPERTY_COOKIE, type AIProviderName } from "@/lib/session";
 import { resolveSettings, type LadderStep } from "@/lib/settings";
 
-function targetPropertyId(): string {
-  const db = getDb();
-  const existing = listProperties(db);
-  if (existing.length) return (existing.find((p) => p.unitCount > 0) ?? existing[0]).id;
+const ALLOWED = /\.(csv|tsv|txt|xlsx|xls|pdf|jpe?g|png|webp|tiff?)$/i;
+
+/** The property new files go into: the selected one, or a first property created on the spot. */
+async function targetProperty(): Promise<{ db: DB; propertyId: string }> {
+  const { db, current } = await getProperties();
+  if (current) return { db, propertyId: current.id };
   ensureProperty(db, "my-property", "My property");
-  return "my-property";
+  (await cookies()).set(PROPERTY_COOKIE, "my-property", cookieOptions);
+  return { db, propertyId: "my-property" };
 }
 
 /** Rebuild quietly when a rent roll already exists, so review decisions show up everywhere. */
-function rebuildIfBuilt(propertyId: string) {
-  const db = getDb();
+function rebuildIfBuilt(db: DB, propertyId: string) {
   if (db.select().from(units).where(eq(units.propertyId, propertyId)).all().length) buildRentRoll(db, propertyId);
   revalidatePath("/", "layout");
 }
 
 export async function uploadFiles(formData: FormData): Promise<IngestResult[]> {
-  const db = getDb();
-  const propertyId = targetPropertyId();
+  const { db, propertyId } = await targetProperty();
   const out: IngestResult[] = [];
   for (const file of formData.getAll("files")) {
     if (!(file instanceof File) || !file.size) continue;
+    if (!ALLOWED.test(file.name)) {
+      out.push({ fileId: "", name: file.name, kind: "unknown", rows: 0, needsReview: 0, note: "Tally reads CSV, Excel, PDF and image files." });
+      continue;
+    }
+    if (file.size > MAX_IMPORT_BYTES) {
+      out.push({ fileId: "", name: file.name, kind: "unknown", rows: 0, needsReview: 0, note: "That file is larger than 25 MB." });
+      continue;
+    }
     out.push(await ingestFile(db, propertyId, file.name, Buffer.from(await file.arrayBuffer())));
   }
   revalidatePath("/", "layout");
   return out;
 }
 
+/** Import a Google Sheet or a CSV/Excel link. The link is saved with the file so it can be refreshed later. */
+export async function importFromLink(link: string): Promise<IngestResult | { error: string }> {
+  try {
+    const target = normalizeImportUrl(link);
+    const buf = await fetchLinkedFile(target);
+    const { db, propertyId } = await targetProperty();
+    const res = await ingestFile(db, propertyId, target.fileName, buf, { link: link.trim() });
+    rebuildIfBuilt(db, propertyId);
+    return res;
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+/** Re-download a linked file and re-read it. */
+export async function refreshLink(fileId: string): Promise<{ error?: string }> {
+  const db = await getReadyDb();
+  const file = db.select().from(sourceFiles).where(eq(sourceFiles.id, fileId)).get();
+  const link = file?.meta.link as string | undefined;
+  if (!file || !link) return { error: "That file isn't connected to a link." };
+  try {
+    const target = normalizeImportUrl(link);
+    await ingestFile(db, file.propertyId, file.name, await fetchLinkedFile(target), { link });
+    rebuildIfBuilt(db, file.propertyId);
+    return {};
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+export async function removeFile(fileId: string): Promise<void> {
+  const db = await getReadyDb();
+  const file = db.select().from(sourceFiles).where(eq(sourceFiles.id, fileId)).get();
+  if (!file) return;
+  db.delete(stagedRows).where(eq(stagedRows.sourceFileId, fileId)).run();
+  db.delete(sourceFiles).where(eq(sourceFiles.id, fileId)).run();
+  fs.rmSync(file.path, { force: true });
+  rebuildIfBuilt(db, file.propertyId);
+}
+
 export async function loadSample(): Promise<void> {
-  await importSampleData(getDb());
+  const db = await getReadyDb();
+  await importSampleData(db);
+  (await cookies()).set(PROPERTY_COOKIE, SAMPLE_PROPERTY_ID, cookieOptions);
   revalidatePath("/", "layout");
 }
 
 export async function saveMapping(fileId: string, sheet: string, mapping: Record<string, string>): Promise<void> {
-  const db = getDb();
+  const db = await getReadyDb();
+  const file = db.select().from(sourceFiles).where(eq(sourceFiles.id, fileId)).get();
+  if (!file) return;
   remapTable(db, fileId, sheet, mapping);
-  rebuildIfBuilt(targetPropertyId());
+  rebuildIfBuilt(db, file.propertyId);
 }
 
 export async function reviewRow(rowId: string, decision: "accept" | "reject" | "fix", fixes: Record<string, string> = {}): Promise<{ error?: string }> {
-  const db = getDb();
+  const db = await getReadyDb();
   const row = db.select().from(stagedRows).where(eq(stagedRows.id, rowId)).get();
   if (!row) return { error: "That item no longer exists." };
   if (decision === "fix") {
@@ -78,21 +137,21 @@ export async function reviewRow(rowId: string, decision: "accept" | "reject" | "
   } else {
     db.update(stagedRows).set({ status: decision === "accept" ? "accepted" : "rejected" }).where(eq(stagedRows.id, rowId)).run();
   }
-  rebuildIfBuilt(row.propertyId);
+  rebuildIfBuilt(db, row.propertyId);
   return {};
 }
 
 export async function resolveConflict(conflictId: string, value: string): Promise<void> {
-  const db = getDb();
+  const db = await getReadyDb();
   const c = db.select().from(conflicts).where(eq(conflicts.id, conflictId)).get();
   if (!c) return;
   db.insert(resolutions).values({ key: conflictId, value }).onConflictDoUpdate({ target: resolutions.key, set: { value, decidedAt: new Date().toISOString() } }).run();
-  rebuildIfBuilt(c.propertyId);
+  rebuildIfBuilt(db, c.propertyId);
 }
 
 /** The owner tells Tally which unit an unmatched deposit belongs to. */
 export async function assignDeposit(stagedRowId: string, unit: string): Promise<{ error?: string }> {
-  const db = getDb();
+  const db = await getReadyDb();
   const row = db.select().from(stagedRows).where(eq(stagedRows.id, stagedRowId)).get();
   if (!row) return { error: "That deposit no longer exists." };
   const u = unit.trim().toUpperCase();
@@ -100,23 +159,97 @@ export async function assignDeposit(stagedRowId: string, unit: string): Promise<
   if (!known) return { error: `There's no unit ${unit} on the rent roll.` };
   const data = { ...row.data, memo: { value: `UNIT ${u} (assigned by owner)`, confidence: 1 } };
   db.update(stagedRows).set({ data, status: "fixed" }).where(eq(stagedRows.id, stagedRowId)).run();
-  rebuildIfBuilt(row.propertyId);
+  rebuildIfBuilt(db, row.propertyId);
   return {};
 }
 
 export async function buildNow(): Promise<void> {
-  const db = getDb();
-  const propertyId = targetPropertyId();
+  const { db, propertyId } = await targetProperty();
   buildRentRoll(db, propertyId);
   revalidatePath("/", "layout");
   redirect(`/property/${propertyId}`);
 }
 
+// ---------- properties ----------
+export async function createProperty(formData: FormData): Promise<void> {
+  const name = String(formData.get("name") ?? "").trim().slice(0, 80);
+  if (!name) return;
+  const db = await getReadyDb();
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "property";
+  let id = base;
+  for (let n = 2; db.select().from(properties).where(eq(properties.id, id)).get(); n++) id = `${base}-${n}`;
+  db.insert(properties).values({ id, name }).run();
+  (await cookies()).set(PROPERTY_COOKIE, id, cookieOptions);
+  revalidatePath("/", "layout");
+  redirect("/import");
+}
+
+export async function switchProperty(id: string): Promise<void> {
+  const db = await getReadyDb();
+  const p = db.select().from(properties).where(eq(properties.id, id)).get();
+  if (!p) return;
+  (await cookies()).set(PROPERTY_COOKIE, id, cookieOptions);
+  revalidatePath("/", "layout");
+  redirect(p.unitCount > 0 ? `/property/${id}` : "/import");
+}
+
+function deletePropertyRows(db: DB, id: string) {
+  for (const file of db.select().from(sourceFiles).where(eq(sourceFiles.propertyId, id)).all()) fs.rmSync(file.path, { force: true });
+  for (const t of [units, leases, charges, payments, conflicts, fieldProvenance, notices, promises, comps, stagedRows, sourceFiles]) {
+    db.delete(t).where(eq(t.propertyId, id)).run();
+  }
+  for (const r of db.select().from(resolutions).all()) if (r.key.startsWith(`${id}|`)) db.delete(resolutions).where(eq(resolutions.key, r.key)).run();
+  db.delete(properties).where(eq(properties.id, id)).run();
+}
+
+export async function deleteProperty(formData: FormData): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  const db = await getReadyDb();
+  deletePropertyRows(db, id);
+  (await cookies()).delete(PROPERTY_COOKIE);
+  revalidatePath("/", "layout");
+  redirect("/settings?deleted=1");
+}
+
+/** Erase everything in this workspace: every property, file, letter and setting. */
+export async function deleteAllData(): Promise<void> {
+  wipeDb(await getReadyDb());
+  (await cookies()).delete(PROPERTY_COOKIE);
+  revalidatePath("/", "layout");
+  redirect("/?erased=1");
+}
+
+// ---------- the owner's own AI key ----------
+/**
+ * Check a key with the provider, then keep it in an httpOnly cookie in this
+ * browser. It is never written to the database and never sent back to the page.
+ */
+export async function saveAiKey(provider: AIProviderName, apiKey: string, model: string): Promise<{ error?: string; ok?: string }> {
+  const key = apiKey.trim();
+  if (provider !== "openai" && provider !== "xai") return { error: "Choose a provider." };
+  if (key.length < 20 || /\s/.test(key)) return { error: "That doesn't look like an API key." };
+  const base = (provider === "openai" ? process.env.OPENAI_BASE_URL : process.env.XAI_BASE_URL) ?? BASE_URLS[provider];
+  try {
+    const res = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15_000) });
+    if ([400, 401, 403].includes(res.status)) return { error: "The provider rejected that key. Check that it was copied in full and is still active." };
+    if (!res.ok) return { error: `The provider returned an error (${res.status}). Try again in a minute.` };
+  } catch {
+    return { error: "Tally couldn't reach the provider to check the key. Check your connection and try again." };
+  }
+  const chosen = model.trim().slice(0, 60);
+  (await cookies()).set(AI_COOKIE, JSON.stringify({ provider, apiKey: key, ...(chosen ? { model: chosen } : {}) }), cookieOptions);
+  revalidatePath("/", "layout");
+  return { ok: `Key saved. Tally will use ${provider === "openai" ? "OpenAI" : "xAI"} (${chosen || DEFAULT_MODELS[provider]}) from this browser.` };
+}
+
+export async function clearAiKey(): Promise<void> {
+  (await cookies()).delete(AI_COOKIE);
+  revalidatePath("/", "layout");
+}
+
 export async function updateSettings(formData: FormData): Promise<void> {
-  const ctx = await getContext();
-  if (!ctx) return;
-  const db = getDb();
-  const p = ctx.data.property;
+  const { db, current: p } = await getProperties();
+  if (!p) return;
   const s = resolveSettings(p.settings);
   const str = (k: string) => String(formData.get(k) ?? "").trim();
   const num = (k: string, fallback: number) => {
@@ -206,7 +339,7 @@ export async function approveLetter(input: { leaseId: string; type: string; lang
   const lease = ctx.data.leaseById.get(input.leaseId);
   if (!lease) return { error: "Resident not found." };
   const id = crypto.randomUUID();
-  getDb().insert(notices).values({
+  ctx.db.insert(notices).values({
     id, propertyId: ctx.data.property.id, unitNumber: ctx.data.unitNumberOf(lease.id), resident: lease.residents.join(" & "), type: input.type,
     language: input.language, body: input.body, amount: input.amount, status: "approved", approvedBy: ctx.data.settings.ownerName,
     approvedAt: new Date().toISOString(), sourceId: null, confidence: 1,
@@ -216,7 +349,7 @@ export async function approveLetter(input: { leaseId: string; type: string; lang
 }
 
 export async function markSent(noticeId: string, method: string): Promise<void> {
-  getDb().update(notices).set({ status: "sent", method, sentAt: new Date().toISOString() }).where(eq(notices.id, noticeId)).run();
+  (await getReadyDb()).update(notices).set({ status: "sent", method, sentAt: new Date().toISOString() }).where(eq(notices.id, noticeId)).run();
   revalidatePath("/delinquency");
 }
 
@@ -227,7 +360,7 @@ export async function addPromise(unitNumber: string, amountRaw: string, dateRaw:
   const date = parseDate(dateRaw);
   if (amount == null || amount <= 0) return { error: "Enter the amount promised." };
   if (!date) return { error: "Enter the date promised." };
-  getDb().insert(promises).values({ id: crypto.randomUUID(), propertyId: ctx.data.property.id, unitNumber, amount, promisedFor: date, note }).run();
+  ctx.db.insert(promises).values({ id: crypto.randomUUID(), propertyId: ctx.data.property.id, unitNumber, amount, promisedFor: date, note }).run();
   revalidatePath("/delinquency");
   return {};
 }

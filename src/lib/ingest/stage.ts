@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import { getProvider } from "../ai/provider";
-import { dataDir, type DB } from "../db/client";
+import { dataDirOf, type DB } from "../db/client";
 import { columnMappings, sourceFiles, stagedRows, type StagedField } from "../db/schema";
 import { parseDate } from "../dates";
 import {
@@ -133,20 +133,21 @@ export interface IngestResult {
   note?: string;
 }
 
-export async function ingestFile(db: DB, propertyId: string, name: string, buf: Buffer): Promise<IngestResult> {
+export async function ingestFile(db: DB, propertyId: string, name: string, buf: Buffer, opts: { link?: string } = {}): Promise<IngestResult> {
   const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
-  const fileId = sha256.slice(0, 12);
+  // the same file can be added to two properties, so the id covers both
+  const fileId = crypto.createHash("sha256").update(propertyId + ":" + (opts.link ?? sha256)).digest("hex").slice(0, 12);
   const safe = name.replace(/[^\w.\-]+/g, "_");
-  const filePath = path.join(dataDir(), "uploads", `${fileId}-${safe}`);
+  const filePath = path.join(dataDirOf(db), "uploads", `${fileId}-${safe}`);
   let stored = buf;
   const e = ext(name);
 
   let kind: FileKind = "unknown";
   let status: "parsed" | "unsupported" | "error" = "parsed";
   let rows: NewStaged[] = [];
-  const meta: Record<string, unknown> = { sha256 };
+  const meta: Record<string, unknown> = { sha256, ...(opts.link ? { link: opts.link, syncedAt: new Date().toISOString() } : {}) };
   let note: string | undefined;
-  const provider = getProvider();
+  const provider = await getProvider();
 
   try {
     if (e === ".csv" || e === ".tsv" || e === ".txt" || e === ".xlsx" || e === ".xls") {

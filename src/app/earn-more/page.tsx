@@ -16,7 +16,7 @@ export default async function EarnMorePage() {
   const { data, a } = ctx;
   const recs = runRecommendations(buildRecInput(data, a));
   const total = availableRevenue(recs);
-  const provider = getProvider();
+  const provider = await getProvider();
   // The rules engine computed every figure; the AI may only reword the explanation.
   const explanations = await Promise.all(recs.map((r) =>
     provider.generate({

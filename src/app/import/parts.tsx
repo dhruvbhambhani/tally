@@ -2,15 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { ArrowRight, ChevronDown, Loader2, Upload } from "lucide-react";
-import { assignDeposit, buildNow, loadSample, resolveConflict, reviewRow, saveMapping, uploadFiles } from "@/app/actions";
+import { ArrowRight, Camera, ChevronDown, Link2, Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
+import { assignDeposit, buildNow, importFromLink, loadSample, refreshLink, removeFile, resolveConflict, reviewRow, saveMapping, uploadFiles } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------- drop zone
-export function DropZone({ hasFiles, demo }: { hasFiles: boolean; demo: boolean }) {
+export function DropZone({ hasFiles, demo, maxMb }: { hasFiles: boolean; demo: boolean; maxMb: number }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [progress, setProgress] = useState<{ name: string; state: "reading" | "done" | "problem"; note?: string }[]>([]);
   const [busy, start] = useTransition();
@@ -21,6 +22,10 @@ export function DropZone({ hasFiles, demo }: { hasFiles: boolean; demo: boolean 
     start(async () => {
       // one file at a time so each row can show its own result
       for (const f of files) {
+        if (f.size > maxMb * 1024 * 1024) {
+          setProgress((p) => p.map((x) => (x.name === f.name ? { ...x, state: "problem", note: `Larger than ${maxMb} MB. Export a smaller date range, or run your own copy of Tally.` } : x)));
+          continue;
+        }
         const fd = new FormData();
         fd.append("files", f);
         try {
@@ -55,6 +60,9 @@ export function DropZone({ hasFiles, demo }: { hasFiles: boolean; demo: boolean 
           <Button variant={hasFiles ? "outline" : "primary"} size={hasFiles ? "md" : "lg"} disabled={busy} onClick={() => input.current?.click()}>
             {busy ? <Loader2 className="animate-spin" /> : null} Choose files
           </Button>
+          <input ref={camera} type="file" accept="image/*" capture="environment" className="sr-only" aria-label="Take a photo"
+            onChange={(e) => { send([...(e.target.files ?? [])]); e.target.value = ""; }} />
+          <Button variant="outline" size={hasFiles ? "md" : "lg"} disabled={busy} onClick={() => camera.current?.click()}><Camera /> Scan a page</Button>
           {!hasFiles ? (
             <button type="button" disabled={busy} className="cursor-pointer text-sm font-medium text-ink underline-offset-4 hover:underline disabled:opacity-50"
               onClick={() => start(async () => { await loadSample(); router.refresh(); })}>
@@ -63,7 +71,7 @@ export function DropZone({ hasFiles, demo }: { hasFiles: boolean; demo: boolean 
           ) : null}
         </div>
       </div>
-      {demo ? <p className="mt-3 text-[13px] text-muted">Running without an AI key: spreadsheets, bank statements and plainly worded leases are read directly; new handwriting needs a key.</p> : null}
+      {demo ? <p className="mt-3 text-[13px] text-muted">No AI key yet: spreadsheets, bank statements and plainly worded leases are read directly. To read photos of handwriting and unusual leases, <a href="/settings#ai" className="font-medium text-ink underline underline-offset-2">add your own API key</a>.</p> : null}
       {progress.length ? (
         <ul className="mt-4 space-y-1 text-sm" aria-live="polite">
           {progress.map((p) => (
@@ -276,5 +284,60 @@ export function BuildButton({ label }: { label: string }) {
     <Button variant="primary" size="lg" disabled={busy} onClick={() => start(() => buildNow())}>
       {busy ? <Loader2 className="animate-spin" /> : null} {label} <ArrowRight />
     </Button>
+  );
+}
+
+// ---------------------------------------------------------------- connected links
+export function LinkImport() {
+  const router = useRouter();
+  const [url, setUrl] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, start] = useTransition();
+  return (
+    <form className="mt-4 max-w-[760px]" onSubmit={(e) => {
+      e.preventDefault();
+      start(async () => {
+        const r = await importFromLink(url);
+        if ("error" in r) setMsg({ ok: false, text: r.error });
+        else { setMsg({ ok: true, text: `Connected ${r.name}: ${r.rows} records.` }); setUrl(""); router.refresh(); }
+      });
+    }}>
+      <label htmlFor="link" className="text-[13px] text-muted">Or connect a Google Sheet, or a link to a CSV or Excel file</label>
+      <div className="mt-1.5 flex gap-2">
+        <div className="relative flex-1">
+          <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <input id="link" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…"
+            className="h-10 w-full rounded-lg border border-line pl-9 pr-3 text-sm" />
+        </div>
+        <Button type="submit" disabled={busy || !url.trim()}>{busy ? <Loader2 className="animate-spin" /> : null} Connect</Button>
+      </div>
+      {msg ? <p className={cn("mt-2 text-sm", msg.ok ? "text-accent" : "text-danger")} role={msg.ok ? "status" : "alert"}>{msg.text}</p> : null}
+    </form>
+  );
+}
+
+export function FileActions({ fileId, name, linked }: { fileId: string; name: string; linked: boolean }) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, start] = useTransition();
+  return (
+    <span className="flex items-center gap-1">
+      {linked ? (
+        <Button size="sm" variant="ghost" disabled={busy} title="Pull in the latest version from the link"
+          onClick={() => start(async () => { const r = await refreshLink(fileId); setError(r.error ?? ""); router.refresh(); })}>
+          <RefreshCw className={cn(busy && "animate-spin")} /> Refresh
+        </Button>
+      ) : null}
+      {confirming ? (
+        <>
+          <Button size="sm" disabled={busy} onClick={() => start(async () => { await removeFile(fileId); router.refresh(); })}>Remove</Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Keep</Button>
+        </>
+      ) : (
+        <Button size="sm" variant="ghost" aria-label={`Remove ${name}`} onClick={() => setConfirming(true)}><Trash2 /></Button>
+      )}
+      {error ? <span className="text-[13px] text-danger" role="alert">{error}</span> : null}
+    </span>
   );
 }

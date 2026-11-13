@@ -150,7 +150,7 @@ export function templateLetter(i: LetterInput): Letter {
 /** Template first; the AI provider may reword it, but the figures must survive intact. */
 export async function writeLetter(input: LetterInput): Promise<Letter> {
   const base = templateLetter(input);
-  const body = await getProvider().generate({
+  const body = await (await getProvider()).generate({
     task: `${input.type}_${input.channel}`, language: input.language, facts: base.facts, fallback: base.body,
     instructions: input.channel === "sms" ? "This is a text message: under 320 characters." : "Keep the itemized lines exactly as given.",
   });

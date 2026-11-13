@@ -46,13 +46,13 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 const SYNONYMS: Record<string, string[]> = {
-  unit: ["unit", "apt", "apt #", "apartment", "unit #", "unit number", "unit no", "space", "door"],
-  unitType: ["bd/ba", "unit type", "type", "floorplan", "floor plan", "bed/bath", "beds/baths"],
-  sqft: ["sq. ft.", "sqft", "sq ft", "square feet", "sf", "area"],
-  status: ["status", "unit status", "occupancy", "occupancy status"],
-  tenant: ["tenant", "resident", "name", "tenant name", "resident name", "residents", "tenants", "lessee", "occupant"],
-  marketRent: ["market rent", "market", "mkt rent", "asking rent"],
-  rent: ["rent", "rent amt", "contract rent", "lease rent", "monthly rent", "actual rent", "current rent", "rent amount"],
+  unit: ["unit", "apt", "apt #", "apartment", "unit #", "unit number", "unit no", "space", "door", "unit name", "unit id", "bldg/unit", "bldg-unit", "apt no", "apartment #", "suite", "unit/apt"],
+  unitType: ["bd/ba", "unit type", "type", "floorplan", "floor plan", "bed/bath", "beds/baths", "floorplan name", "unit type code", "br/ba", "bd / ba", "beds / baths", "bedrooms/bathrooms"],
+  sqft: ["sq. ft.", "sqft", "sq ft", "square feet", "sf", "area", "unit sq ft", "unit sqft", "sqft.", "square footage", "sq. feet", "sq feet"],
+  status: ["status", "unit status", "occupancy", "occupancy status", "lease status", "unit/lease status", "unit occupancy"],
+  tenant: ["tenant", "resident", "name", "tenant name", "resident name", "residents", "tenants", "lessee", "occupant", "tenant(s)", "resident(s)", "primary tenant", "lessee name", "occupant name", "lease name", "resident names"],
+  marketRent: ["market rent", "market", "mkt rent", "asking rent", "market rent amount", "mkt", "listed rent", "market"],
+  rent: ["rent", "rent amt", "contract rent", "lease rent", "monthly rent", "actual rent", "current rent", "rent amount", "scheduled rent", "rent charge", "effective rent", "base rent", "lease charges", "charge amount"],
   pet: ["pet rent", "pet fee", "pet charge"],
   parking: ["parking", "garage", "carport", "parking fee"],
   storage: ["storage", "storage fee"],
@@ -60,11 +60,11 @@ const SYNONYMS: Record<string, string[]> = {
   concession: ["concession", "concessions", "discount", "special"],
   concessionEnds: ["concession ends", "concession end", "discount ends"],
   subsidy: ["subsidy", "hap", "voucher", "housing assistance", "section 8"],
-  deposit: ["deposit", "dep", "security deposit", "sec dep", "deposit held"],
-  leaseStart: ["lease from", "lease start", "start", "start date", "lease begin"],
-  leaseEnd: ["lease to", "lease end", "lease exp", "expiration", "end date", "lease expiration", "expires", "lease expires"],
-  moveIn: ["move-in", "move in", "moved in", "move in date"],
-  vacantSince: ["vacant since", "vacated", "move-out", "move out"],
+  deposit: ["deposit", "dep", "security deposit", "sec dep", "deposit held", "resident deposit", "deposits held", "security deposits", "deposit on hand", "total deposits", "other deposit"],
+  leaseStart: ["lease from", "lease start", "start", "start date", "lease begin", "lease start date", "lease begin date", "lease from date", "start of lease"],
+  leaseEnd: ["lease to", "lease end", "lease exp", "expiration", "end date", "lease expiration", "expires", "lease expires", "lease end date", "lease expiration date", "lease to date", "end of lease", "expiration date", "lease exp date"],
+  moveIn: ["move-in", "move in", "moved in", "move in date", "move-in date", "movein", "move in date"],
+  vacantSince: ["vacant since", "vacated", "move-out", "move out", "move-out date", "move out date"],
   notes: ["notes", "comments", "comment"],
   hasPet: ["pet?", "pets?", "pet", "pets"],
   date: ["date", "posting date", "post date", "transaction date", "paid on", "date paid", "trans date"],
@@ -97,7 +97,14 @@ export function findHeaderRow(rows: string[][]): number {
 export function suggestMapping(headers: string[], kind: TableKind): Record<string, string> {
   const mapping: Record<string, string> = {};
   const used = new Set<string>();
+  // Yardi-style exports have a "Resident" code column next to a "Name" column: the name is the person.
+  const nameCol = headers.find((h) => norm(h) === "name");
+  if (kind === "rent_roll" && nameCol && headers.some((h) => norm(h) === "resident")) {
+    mapping.tenant = nameCol;
+    used.add(nameCol);
+  }
   for (const field of fieldsForKind(kind)) {
+    if (mapping[field]) continue;
     for (const syn of SYNONYMS[field] ?? []) {
       const h = headers.find((x) => norm(x) === syn && !used.has(x));
       if (h) {
@@ -130,6 +137,7 @@ const DATE_FIELDS = new Set(["leaseStart", "leaseEnd", "moveIn", "vacantSince", 
 
 export function parseStatus(raw: string, tenant: string): string | null {
   const s = (raw || "").toLowerCase();
+  if (/no notice/.test(s)) return "occupied";
   if (/notice/.test(s)) return "notice";
   if (/vacant/.test(s) || /^vacant$/i.test(tenant.trim())) return "vacant";
   if (/down|offline/.test(s)) return "down";
